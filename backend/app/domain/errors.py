@@ -16,3 +16,15 @@ class PricingConfigError(DomainError):
 
 class ExpiredPromotionError(DomainError):
     """Una promoción aplicada en el cálculo ya terminó: hay que recalcular antes de emitir."""
+
+
+class NotFoundError(DomainError):
+    """El recurso pedido no existe."""
+
+
+class PermissionDeniedError(DomainError):
+    """El usuario no tiene permiso para la operación (rol o propiedad de la cotización)."""
+
+
+class ExternalServiceError(DomainError):
+    """Un sistema externo (ERP) no respondió; la operación se puede reintentar."""

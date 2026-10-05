@@ -117,6 +117,24 @@ Toda otra transición lanza un error de dominio. Cada transición registra un ev
 - `domain/deadlines.py`: `approval_due` (RN-09), `valid_until` (RN-11), `follow_up_due` (RN-12).
 - `tests/unit/test_architecture.py` falla si `domain/`, `application/` o `ports/` importan infraestructura, o si el dominio lee el reloj.
 
+## Capas del backend (desde la Fase 3)
+
+- `application/quotes.py`: `QuoteService` con los casos de uso crear, editar, calcular, emitir y consultar. Aquí se validan rol y propiedad de la cotización.
+- `ports/external.py` y `ports/repositories.py`: interfaces (`Protocol`). `adapters/`: `erp_http.py` (catálogo e inventario), `sql_repositories.py` (cotizaciones y parámetros), `sql_misc.py` (canales, eventos, notificaciones), `clock.py`.
+- `api/deps.py` conecta puertos con adaptadores y resuelve autenticación (`get_current_user`, `require_roles`). `api/routers/`: `auth`, `catalog`, `quotes`, `pricing`, `users`.
+- `main.py` traduce los errores de dominio a HTTP: no existe 404, sin permiso 403, transición inválida 409, datos inválidos 422, ERP caído 503.
+- Las rutas llaman al caso de uso y luego hacen `session.commit()`; los adaptadores solo hacen `flush`.
+- La administración de pricing y de usuarios es gestión de datos sin flujo: sus rutas usan el ORM directamente. Las reglas de calidad de promociones sí están en `domain/promotions.py`.
+- En la API los porcentajes viajan como fracción (`0.04` = 4 %) y los importes como texto decimal (`"729.60"`).
+- La caducidad del JWT usa la hora real del sistema, no `ClockPort`.
+
+### Pruebas
+
+- `tests/conftest.py` ofrece: `db` (sesión con semillas), `client` (API con ERP y reloj falsos), `erp` (`FakeErp`, catálogo en memoria), `clock` (`FakeClock`, se adelanta con `clock.advance(minutes=5)`), `as_user("ejecutivo")` (cabeceras) y `demo_channel`.
+- `tests/helpers.py` tiene atajos: `create_quote`, `calculate`, `issue`, `create_calculated`, `line`.
+- `tests/scenarios/` tiene un archivo por escenario E1–E10; recorren la API completa.
+- Tras un `session.commit()` del código probado, los datos de la prueba siguen ahí: la sesión usa savepoints y todo se revierte al final.
+
 ## Roles y permisos (Tabla 32)
 
 | Acción | Ejecutivo | Aprobador | Gerente | Pricing | Admin |

@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://cotiza:cotiza@localhost:5433/cotiza"
     erp_base_url: str = "http://localhost:8001"
     jwt_secret: str = "solo-para-demo-cambiar-en-produccion"
+    jwt_expire_minutes: int = 480
     storage_dir: str = "./storage"
+    # Costo de bcrypt. Las pruebas lo bajan para no gastar segundos en cada contraseña.
+    bcrypt_rounds: int = 12
 
 
 @lru_cache
