@@ -1,0 +1,5 @@
+# Finales de línea LF en todo el repositorio: los archivos se copian a contenedores Linux.
+* text=auto eol=lf
+*.png binary
+*.docx binary
+*.pdf binary

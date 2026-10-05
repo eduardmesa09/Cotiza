@@ -143,21 +143,31 @@ Integración real con ERP/CRM/portal, conversión a orden, envío por correo, fi
 - Cada entidad o módulo que se cree o corrija va con su test. Los escenarios E1–E10 tienen un test cada uno.
 - El tiempo se obtiene siempre de `ClockPort`; nada de `datetime.now()` en dominio ni casos de uso.
 - Comentarios solo donde aporten (el porqué, la regla RN que se aplica).
-- Commits pequeños y descriptivos, en español.
+- Los commits los hace Eduard al revisar cada fase; no confirmar ni crear ramas por cuenta propia.
 - Se trabaja por fases; al terminar cada una se detiene para revisión.
 
 ## Comandos
 
-Disponibles a partir de la Fase 1.
-
 ```bash
 docker compose up --build        # levanta todo, con migraciones y semillas
-docker compose down -v           # borra también la base de datos
-make test                        # pytest + Vitest
-docker compose run --rm api pytest            # equivalente sin make (Windows)
-docker compose run --rm api pytest tests/unit # solo dominio, sin BD ni red
-docker compose run --rm api alembic revision --autogenerate -m "mensaje"
+docker compose down -v           # borra también la base de datos (regenera semillas)
+make test                        # todas las pruebas; en Windows sin make: .\scripts	est.ps1
+
+# Pruebas por servicio (reconstruir la imagen antes: el código se copia, no se monta)
+docker compose build api && docker compose run --rm --no-deps api pytest
+docker compose build erp-mock && docker compose run --rm --no-deps erp-mock pytest
+docker compose --profile test build frontend-test && docker compose --profile test run --rm frontend-test
+cd frontend && npm test          # Vitest local, más rápido para iterar
+
+# Nueva migración tras cambiar app/infra/models.py (monta versions/ para que el archivo quede en el repo)
+docker compose run --rm --no-deps -v "$PWD/backend/alembic/versions:/app/alembic/versions" api   alembic revision --autogenerate -m "mensaje"
 ```
+
+- Puertos: web 8080, API 8000 (`/api/docs`), ERP simulado 8001 (`/docs`), PostgreSQL 5433.
+- Las pruebas del backend necesitan el servicio `db` arriba; usan una base aparte, `cotiza_test`, y cada prueba se revierte.
+- `tests/infra/test_migrations.py` falla si los modelos y las migraciones no coinciden.
+- Usuarios semilla: `ejecutivo`, `aprobador`, `gerente`, `pricing`, `admin`; contraseña `Cotiza2026*`.
+- Referencia de demo `POR-DEMO01` (costo 620, lista 800, promoción vigente del 5 %) y canal de demo "Soluciones Andinas TI S.A.S. (demo)", nivel Plata: reproducen el caso de prueba obligatorio.
 
 ## Fases
 
