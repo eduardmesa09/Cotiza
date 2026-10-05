@@ -103,6 +103,19 @@ Toda otra transición lanza un error de dominio. Cada transición registra un ev
 - **Vigencia:** min(emisión + 7 días, fin más temprano de las promociones efectivamente aplicadas).
 - **Planificador:** un job de APScheduler por intervalo que busca en BD plazos vencidos (SLA, 48 h, vigencia). La API corre con un solo worker.
 - **"Mantener en seguimiento":** cierra la tarea y programa otra con el mismo plazo.
+- **Empate entre volumen y promoción (RN-05):** gana el volumen, porque no acorta la vigencia.
+- **Margen mínimo (RN-07):** se compara el margen ya redondeado a 4 decimales, que es el que ve el usuario; un margen igual al mínimo no requiere aprobación.
+- **Recalcular:** `CALCULADA → CALCULADA` está permitido para refrescar precios y disponibilidad sin editar (no aparece en la Figura 8).
+- **Promoción vencida entre el cálculo y la emisión:** la emisión falla con `ExpiredPromotionError` y hay que recalcular.
+- **Festivos:** el tiempo hábil no los modela.
+
+## Dónde vive cada regla (dominio)
+
+- `domain/pricing_engine.py`: RN-01 a RN-08, RN-10, RN-14; `calculate_line`, `evaluate_quote`, `quote_total`.
+- `domain/state_machine.py`: estados, acciones y `next_state`; `allowed_actions` sirve para habilitar botones.
+- `domain/business_time.py`: `business_time_between` y `add_business_time`.
+- `domain/deadlines.py`: `approval_due` (RN-09), `valid_until` (RN-11), `follow_up_due` (RN-12).
+- `tests/unit/test_architecture.py` falla si `domain/`, `application/` o `ports/` importan infraestructura, o si el dominio lee el reloj.
 
 ## Roles y permisos (Tabla 32)
 
@@ -155,6 +168,7 @@ make test                        # todas las pruebas; en Windows sin make: .\scr
 
 # Pruebas por servicio (reconstruir la imagen antes: el código se copia, no se monta)
 docker compose build api && docker compose run --rm --no-deps api pytest
+docker compose run --rm --no-deps api pytest tests/unit   # solo dominio: no necesita base de datos
 docker compose build erp-mock && docker compose run --rm --no-deps erp-mock pytest
 docker compose --profile test build frontend-test && docker compose --profile test run --rm frontend-test
 cd frontend && npm test          # Vitest local, más rápido para iterar

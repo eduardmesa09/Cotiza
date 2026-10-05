@@ -8,5 +8,6 @@ psycopg[binary]~=3.2.0
 httpx~=0.28.0
 bcrypt~=4.2.0
 Faker~=33.1.0
+tzdata
 # Pruebas
 pytest~=8.3.0
