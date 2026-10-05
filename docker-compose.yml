@@ -1,0 +1,76 @@
+# COTIZA+ — MVP. Levantar con: docker compose up --build
+# Los valores por defecto sirven para la demo; se pueden sobrescribir con un archivo .env.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cotiza
+      POSTGRES_PASSWORD: cotiza
+      POSTGRES_DB: cotiza
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cotiza -d cotiza"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  erp-mock:
+    build: ./erp-mock
+    ports:
+      - "${ERP_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://cotiza:cotiza@db:5432/cotiza
+      ERP_BASE_URL: http://erp-mock:8001
+      JWT_SECRET: ${JWT_SECRET:-solo-para-demo-cambiar-en-produccion}
+      STORAGE_DIR: /data/storage
+    # Migraciones y semillas corren en cada arranque; ambas son idempotentes.
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.infra.seeds &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      erp-mock:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Solo para pruebas (make test): no arranca con "docker compose up".
+  frontend-test:
+    profiles: ["test"]
+    build:
+      context: ./frontend
+      target: deps
+    command: ["npx", "vitest", "run"]
+
+volumes:
+  db_data:
+  storage:
