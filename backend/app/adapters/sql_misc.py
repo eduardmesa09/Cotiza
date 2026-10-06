@@ -57,21 +57,26 @@ class SqlEventAdapter:
         )
         self.session.flush()
 
+    @staticmethod
+    def _to_domain(row: Evento) -> Event:
+        return Event(
+            id=row.id,
+            tipo=EventType(row.tipo),
+            ocurrido_en=row.ocurrido_en,
+            cotizacion_id=row.cotizacion_id,
+            usuario_id=row.usuario_id,
+            payload=row.payload,
+        )
+
     def list_for_quote(self, cotizacion_id: int) -> Sequence[Event]:
         rows = self.session.scalars(
             select(Evento).where(Evento.cotizacion_id == cotizacion_id).order_by(Evento.ocurrido_en, Evento.id)
         )
-        return [
-            Event(
-                id=row.id,
-                tipo=EventType(row.tipo),
-                ocurrido_en=row.ocurrido_en,
-                cotizacion_id=row.cotizacion_id,
-                usuario_id=row.usuario_id,
-                payload=row.payload,
-            )
-            for row in rows
-        ]
+        return [self._to_domain(row) for row in rows]
+
+    def list_all(self) -> Sequence[Event]:
+        rows = self.session.scalars(select(Evento).order_by(Evento.ocurrido_en, Evento.id))
+        return [self._to_domain(row) for row in rows]
 
 
 class SqlNotificationAdapter:
@@ -99,3 +104,6 @@ class SqlUserDirectory:
                 select(Usuario.id).where(Usuario.rol == rol, Usuario.activo.is_(True)).order_by(Usuario.id)
             )
         )
+
+    def name_of(self, usuario_id: int) -> str | None:
+        return self.session.scalar(select(Usuario.nombre).where(Usuario.id == usuario_id))

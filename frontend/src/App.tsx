@@ -1,30 +1,56 @@
-import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { Layout } from "./components/Layout";
+import { Loading } from "./components/ui";
+import { canAccess, homeFor } from "./lib/permissions";
+import { Approvals } from "./pages/Approvals";
+import { Dashboard } from "./pages/Dashboard";
+import { FollowUp } from "./pages/FollowUp";
+import { Login } from "./pages/Login";
+import { ParametersPage, Pricing } from "./pages/Pricing";
+import { QuotePage } from "./pages/QuotePage";
+import { QuotesList } from "./pages/QuotesList";
+import { Users } from "./pages/Users";
 
-type ApiStatus = "consultando" | "disponible" | "no disponible";
+/** Exige sesión y que el rol tenga acceso a la ruta; si no, lleva a la pantalla de inicio del rol. */
+function Guard() {
+  const { user, loading } = useAuth();
+  const { pathname } = useLocation();
+  if (loading) return <Loading label="Verificando sesión…" />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (pathname === "/" || !canAccess(user.rol, pathname)) return <Navigate to={homeFor(user.rol)} replace />;
+  return <Outlet />;
+}
 
-// Página provisional de la Fase 1: confirma que el frontend llega a la API a través de Nginx.
-// Las pantallas del producto se construyen en la Fase 6.
-export default function App() {
-  const [status, setStatus] = useState<ApiStatus>("consultando");
-
-  useEffect(() => {
-    fetch("/api/health")
-      .then((response) => setStatus(response.ok ? "disponible" : "no disponible"))
-      .catch(() => setStatus("no disponible"));
-  }, []);
-
+export function AppRoutes() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-3xl font-bold text-slate-900">COTIZA+</h1>
-        <p className="mt-2 text-slate-600">Cotización automatizada a canales de distribución</p>
-        <p className="mt-6 text-sm text-slate-500">
-          API:{" "}
-          <span className={status === "disponible" ? "font-semibold text-emerald-600" : "font-semibold text-amber-600"}>
-            {status}
-          </span>
-        </p>
-      </div>
-    </main>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route element={<Guard />}>
+        <Route element={<Layout />}>
+          <Route path="/cotizaciones" element={<QuotesList />} />
+          {/* Una sola ruta para "nueva" y para una existente: al calcular por primera vez la
+              pantalla no se vuelve a montar ni parpadea. */}
+          <Route path="/cotizaciones/:id" element={<QuotePage />} />
+          <Route path="/aprobaciones" element={<Approvals />} />
+          <Route path="/seguimiento" element={<FollowUp />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/usuarios" element={<Users />} />
+          <Route path="/parametros" element={<ParametersPage />} />
+          <Route path="/tablero" element={<Dashboard />} />
+        </Route>
+        <Route path="*" element={null} />
+      </Route>
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

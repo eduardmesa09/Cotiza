@@ -26,7 +26,7 @@ from sqlalchemy import Engine, create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_catalog, get_clock, get_inventory
+from app.api.deps import get_catalog, get_clock, get_documents, get_inventory, get_storage
 from app.domain.pricing_engine import ProductData
 from app.application.deadlines import DeadlineReport
 from app.infra.container import build_deadline_service
@@ -132,6 +132,41 @@ class FakeErp:
         return self.stocks.get(referencia, 0)
 
 
+class FakeDocuments:
+    """DocumentPort que no dibuja nada: guarda los datos recibidos para poder verificarlos."""
+
+    def __init__(self) -> None:
+        self.rendered: list[dict] = []
+
+    def render_quote(self, datos: dict) -> bytes:
+        self.rendered.append(datos)
+        return f"%PDF-falso {datos['numero']} v{datos['version']}".encode()
+
+
+class FakeStorage:
+    """StoragePort en memoria."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+
+    def save(self, nombre: str, contenido: bytes) -> str:
+        self.files[nombre] = contenido
+        return nombre
+
+    def read(self, ruta: str) -> bytes:
+        return self.files[ruta]
+
+
+@pytest.fixture
+def documents() -> FakeDocuments:
+    return FakeDocuments()
+
+
+@pytest.fixture
+def storage() -> FakeStorage:
+    return FakeStorage()
+
+
 @pytest.fixture
 def clock() -> FakeClock:
     return FakeClock(T0)
@@ -161,11 +196,15 @@ def db(session: Session) -> Session:
 
 
 @pytest.fixture
-def client(session: Session, erp: FakeErp, clock: FakeClock) -> Iterator[TestClient]:
+def client(
+    session: Session, erp: FakeErp, clock: FakeClock, documents: FakeDocuments, storage: FakeStorage
+) -> Iterator[TestClient]:
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_catalog] = lambda: erp
     app.dependency_overrides[get_inventory] = lambda: erp
     app.dependency_overrides[get_clock] = lambda: clock
+    app.dependency_overrides[get_documents] = lambda: documents
+    app.dependency_overrides[get_storage] = lambda: storage
     yield TestClient(app)
     app.dependency_overrides.clear()
 

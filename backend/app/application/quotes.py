@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from app.application.access import can_view, load_own_quote, load_quote, require_executive
+from app.application.documents import build_quote_document
 from app.domain.deadlines import follow_up_due, valid_until
 from app.domain.errors import InvalidLineError, NotFoundError, PermissionDeniedError
 from app.domain.events import Event, EventType
@@ -14,7 +15,16 @@ from app.domain.parties import ROLES_THAT_SEE_ALL_QUOTES, Actor, Role
 from app.domain.pricing_engine import LineInput, LineResult, calculate_line, net_available
 from app.domain.quote import Quote, QuoteLine
 from app.domain.state_machine import Action, QuoteState, next_state
-from app.ports.external import CatalogPort, ClockPort, CustomerPort, EventPort, InventoryPort
+from app.ports.external import (
+    CatalogPort,
+    ClockPort,
+    CustomerPort,
+    DocumentPort,
+    EventPort,
+    InventoryPort,
+    StoragePort,
+    UserDirectoryPort,
+)
 from app.ports.repositories import PricingRepository, QuoteRepository
 
 
@@ -28,7 +38,13 @@ class QuoteService:
         customers: CustomerPort,
         events: EventPort,
         clock: ClockPort,
+        documents: DocumentPort,
+        storage: StoragePort,
+        users: UserDirectoryPort,
     ) -> None:
+        self.documents = documents
+        self.storage = storage
+        self.users = users
         self.quotes = quotes
         self.pricing = pricing
         self.catalog = catalog
@@ -183,6 +199,12 @@ class QuoteService:
 
         anterior = quote.estado
         quote.emitir(ahora, vigente_hasta, seguimiento_en, disponibles)
+
+        # A6: documento con plantilla única. Si falla, la emisión completa se revierte.
+        channel = self.customers.get(quote.canal_id)
+        ejecutivo = self.users.name_of(quote.ejecutivo_id) or ""
+        datos = build_quote_document(quote, channel, ejecutivo, settings.calendar.tz)
+        quote.pdf_ruta = self.storage.save(f"{quote.numero}-v{quote.version}.pdf", self.documents.render_quote(datos))
         self.quotes.save(quote)
         self.events.record(
             EventType.COTIZACION_EMITIDA,
@@ -196,9 +218,19 @@ class QuoteService:
                 "recibida_en": quote.recibida_en.isoformat(),
                 "vigente_hasta": vigente_hasta.isoformat(),
                 "inventario_comprometido": {l.referencia: l.cantidad_comprometida for l in quote.lineas},
+                "documento": quote.pdf_ruta,
             },
         )
         self.events.record(
             EventType.SEGUIMIENTO_PROGRAMADO, ahora, quote.id, None, {"programado_para": seguimiento_en.isoformat()}
         )
         return quote
+
+    # --- Documento (M5) ----------------------------------------------------------------
+
+    def document(self, actor: Actor, quote_id: int) -> tuple[str, bytes]:
+        """Nombre y contenido del PDF emitido. Lo descarga quien puede consultar la cotización."""
+        quote = self.get(actor, quote_id)
+        if quote.pdf_ruta is None:
+            raise NotFoundError("La cotización todavía no tiene documento: se genera al emitirla")
+        return f"{quote.numero}-v{quote.version}.pdf", self.storage.read(quote.pdf_ruta)

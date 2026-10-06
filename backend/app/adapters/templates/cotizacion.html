@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cotización {{ numero }} v{{ version }}</title>
+<style>
+  @page {
+    size: Letter;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-left { content: "Cotización {{ numero }} · versión {{ version }}"; font-family: "DejaVu Sans", sans-serif; font-size: 8pt; color: #64748b; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font-family: "DejaVu Sans", sans-serif; font-size: 8pt; color: #64748b; }
+  }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #0f172a; line-height: 1.4; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2pt solid #1e3a8a; padding-bottom: 8pt; }
+  .empresa { font-size: 15pt; font-weight: bold; color: #1e3a8a; }
+  .subtitulo { color: #475569; font-size: 8.5pt; }
+  .documento { text-align: right; }
+  .documento .titulo { font-size: 13pt; font-weight: bold; letter-spacing: 1pt; }
+  .documento .numero { font-size: 11pt; color: #1e3a8a; font-weight: bold; }
+  .bloques { display: flex; margin-top: 12pt; }
+  .bloque { flex: 1; border: 0.6pt solid #cbd5e1; border-radius: 4pt; padding: 8pt 10pt; }
+  .bloque + .bloque { margin-left: 12pt; }
+  .fecha { white-space: nowrap; font-weight: bold; }
+  .bloque h2 { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.6pt; color: #64748b; margin: 0 0 4pt 0; }
+  .bloque p { margin: 1pt 0; }
+  .destacado { font-weight: bold; font-size: 10.5pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14pt; }
+  thead th { background: #1e3a8a; color: white; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.4pt; padding: 5pt 6pt; text-align: left; }
+  tbody td { padding: 5pt 6pt; border-bottom: 0.5pt solid #e2e8f0; vertical-align: top; }
+  tbody tr { page-break-inside: avoid; }
+  .num { text-align: right; white-space: nowrap; }
+  .ref { font-weight: bold; white-space: nowrap; }
+  .etiqueta { display: inline-block; font-size: 7.5pt; border-radius: 3pt; padding: 1pt 5pt; white-space: nowrap; }
+  .disponible { background: #dcfce7; color: #166534; }
+  .bajo-pedido { background: #fef3c7; color: #92400e; }
+  tfoot td { padding: 7pt 6pt; font-weight: bold; font-size: 11pt; border-top: 1.5pt solid #1e3a8a; }
+  .condiciones { margin-top: 16pt; page-break-inside: avoid; }
+  .condiciones h2 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.6pt; color: #1e3a8a; margin-bottom: 4pt; }
+  .condiciones ol { margin: 0; padding-left: 14pt; color: #334155; font-size: 8.5pt; }
+  .nota { margin-top: 14pt; font-size: 7.5pt; color: #94a3b8; }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="empresa">Intcomex Colombia</div>
+      <div class="subtitulo">Distribución mayorista de tecnología</div>
+    </div>
+    <div class="documento">
+      <div class="titulo">COTIZACIÓN</div>
+      <div class="numero">{{ numero }} · v{{ version }}</div>
+    </div>
+  </header>
+
+  <section class="bloques">
+    <div class="bloque">
+      <h2>Canal</h2>
+      <p class="destacado">{{ canal.nombre }}</p>
+      <p>NIT {{ canal.nit }} · {{ canal.ciudad }}</p>
+      <p>Atención: {{ canal.contacto_nombre }}</p>
+      <p>{{ canal.contacto_email }}</p>
+    </div>
+    <div class="bloque">
+      <h2>Datos de la cotización</h2>
+      <p>Fecha de emisión: <span class="fecha">{{ emitida_en | fecha_hora }}</span></p>
+      <p>Válida hasta: <span class="fecha">{{ vigente_hasta | fecha_hora }}</span></p>
+      <p>Ejecutivo de cuenta: {{ ejecutivo }}</p>
+      <p>Moneda: {{ moneda }}</p>
+    </div>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Referencia</th>
+        <th>Descripción</th>
+        <th class="num">Cantidad</th>
+        <th class="num">Precio unitario</th>
+        <th class="num">Total</th>
+        <th>Disponibilidad</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for linea in lineas %}
+      <tr>
+        <td class="ref">{{ linea.referencia }}</td>
+        <td>{{ linea.descripcion }}</td>
+        <td class="num">{{ linea.cantidad }}</td>
+        <td class="num">{{ linea.precio_unitario | dinero }}</td>
+        <td class="num">{{ linea.total | dinero }}</td>
+        <td>
+          {% if linea.bajo_pedido %}<span class="etiqueta bajo-pedido">Bajo pedido</span>
+          {% else %}<span class="etiqueta disponible">Disponible</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" class="num">Total {{ moneda }}</td>
+        <td class="num">{{ total | dinero }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <section class="condiciones">
+    <h2>Condiciones comerciales</h2>
+    <ol>
+      {% for condicion in condiciones %}<li>{{ condicion }}</li>{% endfor %}
+    </ol>
+  </section>
+
+  <p class="nota">
+    Documento generado automáticamente por COTIZA+. Prototipo académico con datos simulados; no constituye una oferta comercial real.
+  </p>
+</body>
+</html>

@@ -15,17 +15,25 @@ from sqlalchemy.orm import Session
 
 from app.adapters.clock import SystemClock
 from app.adapters.erp_http import ErpHttpAdapter
+from app.adapters.local_storage import LocalStorageAdapter
 from app.adapters.sql_misc import SqlCustomerAdapter
+from app.adapters.weasyprint_doc import WeasyPrintDocumentAdapter
 from app.application.approvals import ApprovalService
 from app.application.followup import FollowUpService
+from app.application.kpis import KpiService
 from app.application.quotes import QuoteService
 from app.domain.parties import Actor, Role
-from app.infra.container import build_approval_service, build_followup_service, build_quote_service
+from app.infra.container import (
+    build_approval_service,
+    build_followup_service,
+    build_kpi_service,
+    build_quote_service,
+)
 from app.infra.db import get_session
 from app.infra.models import Usuario
 from app.infra.security import decode_access_token
 from app.infra.settings import get_settings
-from app.ports.external import CatalogPort, ClockPort, CustomerPort, InventoryPort
+from app.ports.external import CatalogPort, ClockPort, CustomerPort, DocumentPort, InventoryPort, StoragePort
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -50,6 +58,16 @@ def get_clock() -> ClockPort:
     return SystemClock()
 
 
+@lru_cache
+def get_documents() -> DocumentPort:
+    return WeasyPrintDocumentAdapter()
+
+
+@lru_cache
+def get_storage() -> StoragePort:
+    return LocalStorageAdapter(get_settings().storage_dir)
+
+
 def get_customers(session: Session = Depends(get_session)) -> CustomerPort:
     return SqlCustomerAdapter(session)
 
@@ -59,8 +77,14 @@ def get_quote_service(
     catalog: CatalogPort = Depends(get_catalog),
     inventory: InventoryPort = Depends(get_inventory),
     clock: ClockPort = Depends(get_clock),
+    documents: DocumentPort = Depends(get_documents),
+    storage: StoragePort = Depends(get_storage),
 ) -> QuoteService:
-    return build_quote_service(session, catalog, inventory, clock)
+    return build_quote_service(session, catalog, inventory, clock, documents, storage)
+
+
+def get_kpi_service(session: Session = Depends(get_session), clock: ClockPort = Depends(get_clock)) -> KpiService:
+    return build_kpi_service(session, clock)
 
 
 def get_approval_service(

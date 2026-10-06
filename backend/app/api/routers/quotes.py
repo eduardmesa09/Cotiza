@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -156,3 +156,18 @@ def quote_history(
         )
         for e in events
     ]
+
+
+@router.get("/{quote_id}/pdf", response_class=Response, responses={200: {"content": {"application/pdf": {}}}})
+def download_pdf(
+    quote_id: int,
+    user: CurrentUser = Depends(get_current_user),
+    service: QuoteService = Depends(get_quote_service),
+) -> Response:
+    """Documento emitido de la cotización, tal como lo recibe el canal."""
+    filename, content = service.document(user.actor, quote_id)
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -16,11 +16,19 @@ from app.adapters.sql_repositories import (
 from app.application.approvals import ApprovalService
 from app.application.deadlines import DeadlineService
 from app.application.followup import FollowUpService
+from app.application.kpis import KpiService
 from app.application.quotes import QuoteService
-from app.ports.external import CatalogPort, ClockPort, InventoryPort
+from app.ports.external import CatalogPort, ClockPort, DocumentPort, InventoryPort, StoragePort
 
 
-def build_quote_service(session: Session, catalog: CatalogPort, inventory: InventoryPort, clock: ClockPort) -> QuoteService:
+def build_quote_service(
+    session: Session,
+    catalog: CatalogPort,
+    inventory: InventoryPort,
+    clock: ClockPort,
+    documents: DocumentPort,
+    storage: StoragePort,
+) -> QuoteService:
     return QuoteService(
         quotes=SqlQuoteRepository(session),
         pricing=SqlPricingRepository(session),
@@ -29,7 +37,14 @@ def build_quote_service(session: Session, catalog: CatalogPort, inventory: Inven
         customers=SqlCustomerAdapter(session),
         events=SqlEventAdapter(session),
         clock=clock,
+        documents=documents,
+        storage=storage,
+        users=SqlUserDirectory(session),
     )
+
+
+def build_kpi_service(session: Session, clock: ClockPort) -> KpiService:
+    return KpiService(SqlEventAdapter(session), SqlPricingRepository(session), clock)
 
 
 def build_approval_service(session: Session, clock: ClockPort) -> ApprovalService:

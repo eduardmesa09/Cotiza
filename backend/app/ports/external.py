@@ -67,6 +67,10 @@ class EventPort(Protocol):
 
     def list_for_quote(self, cotizacion_id: int) -> Sequence[Event]: ...
 
+    def list_all(self) -> Sequence[Event]:
+        """Todos los eventos en orden cronológico: la fuente de los indicadores."""
+        ...
+
 
 class ClockPort(Protocol):
     """Única fuente de la hora actual, para que los plazos sean verificables en pruebas."""
@@ -75,6 +79,8 @@ class ClockPort(Protocol):
 
 
 class UserDirectoryPort(Protocol):
-    """A quién avisar: usuarios activos por rol."""
+    """Usuarios internos: a quién avisar (activos por rol) y cómo se llaman."""
 
     def ids_with_role(self, rol: Role) -> Sequence[int]: ...
+
+    def name_of(self, usuario_id: int) -> str | None: ...

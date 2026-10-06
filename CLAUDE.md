@@ -140,6 +140,28 @@ Toda otra transición lanza un error de dominio. Cada transición registra un ev
 - Rutas nuevas: `POST /cotizaciones/{id}/solicitar-aprobacion | cerrar | nueva-version`, `GET /aprobaciones`, `POST /aprobaciones/{id}/aprobar | rechazar`, `GET /seguimiento`, `POST /seguimiento/{id}/resolver`, `GET /notificaciones`.
 - Para la demo: bajar `sla_aprobacion_minutos`, `seguimiento_minutos` y `vigencia_minutos` y poner `horario_habil_activo` en `false` desde la administración de parámetros.
 
+### PDF e indicadores (Fase 5)
+
+- Al emitir, `QuoteService.issue` arma los datos con `application/documents.py`, los dibuja `adapters/weasyprint_doc.py` (plantilla única `adapters/templates/cotizacion.html`) y los guarda `adapters/local_storage.py` en `STORAGE_DIR` como `<numero>-v<version>.pdf`. Si el PDF falla, la emisión completa se revierte.
+- El documento es lo que ve el canal: nunca incluye costo ni margen. Las fechas van en la zona horaria de la operación.
+- `GET /cotizaciones/{id}/pdf` lo descarga quien puede consultar la cotización.
+- `domain/kpis.py` (`compute_kpis`) calcula los indicadores solo con la lista de eventos; incluye línea base AS-IS y meta. `GET /kpis`: el ejecutivo ve los propios; aprobador, gerente y pricing, todos; admin no.
+- Los tiempos de los KPIs son hábiles. Fuera del horario hábil dan 0: para demostrar a deshoras hay que poner `horario_habil_activo` en `false`.
+- K11b se calcula sobre las solicitudes resueltas (una pendiente aún dentro de su SLA no cuenta como incumplida).
+- Las pruebas usan `documents` (`FakeDocuments`, guarda los datos recibidos) y `storage` (`FakeStorage`); WeasyPrint real solo se ejercita en `tests/adapters/test_documents.py`.
+- La imagen de la API instala Pango y la fuente DejaVu, que WeasyPrint necesita.
+
+### Frontend (Fase 6)
+
+- `frontend/src/`: `lib/` (`api.ts` cliente con token, `format.ts`, `permissions.ts`, `useApi.ts`, `types.ts`), `auth/AuthContext.tsx`, `components/` (`ui.tsx` piezas comunes, `Layout.tsx`, `LinesTable.tsx`, `ProductSearch.tsx`, `QuoteHistory.tsx`) y `pages/`.
+- Estilo: navegación superior en píldoras, tarjetas blancas de esquinas amplias sobre fondo gris claro, cifras grandes. La paleta está en `src/index.css` como tokens de Tailwind (`bg-brand`, `text-ink`, `border-line`, `text-muted`, `bg-navy`, `text-accent`, `text-ok`, `text-bad`…): usar los tokens, no colores sueltos. Tipografía Plus Jakarta Sans, empaquetada (funciona sin internet).
+- `lib/permissions.ts` define el menú por rol, la pantalla de inicio y `quoteActions`, que combina rol, propiedad y `acciones_permitidas` para decidir qué botones mostrar. «Emitir» exige además que no haya cambios sin calcular.
+- `/cotizaciones/:id` sirve para una existente y para `nueva`; es una sola ruta a propósito, para que la pantalla no se vuelva a montar al calcular por primera vez.
+- «Calcular» guarda (crea o actualiza) y calcula en un solo paso. No hay «guardar borrador» aparte.
+- Las pantallas con plazos se refrescan solas: aprobaciones cada 10 s, notificaciones y seguimiento cada 20 s, lista y tablero cada 30 s.
+- En las barras del tablero, la línea base usa `chart-base` (`#E0961A`), un paso más oscuro que el naranja de la paleta, que como barra es demasiado claro. Un indicador sin meta (K10) muestra la variación sin calificarla.
+- Pruebas: `src/test/helpers.tsx` trae `mockApi` (simula `fetch` por ruta), `renderApp` y datos de ejemplo (`quote()`, `line()`, `kpi()`).
+
 ### Pruebas
 
 - `tests/conftest.py` ofrece: `db` (sesión con semillas), `client` (API con ERP y reloj falsos), `erp` (`FakeErp`, catálogo en memoria), `clock` (`FakeClock`, se adelanta con `clock.advance(minutes=5)`), `as_user("ejecutivo")` (cabeceras) y `demo_channel`, `run_deadlines()` (un ciclo del planificador con el reloj de la prueba) y `notifications("gerente")`.

@@ -108,6 +108,7 @@ class QuotePresenter:
             lineas=[line_out(linea) for linea in quote.lineas],
             acciones_permitidas=sorted(quote.acciones_permitidas),
             puede_crear_version=quote.puede_versionarse,
+            tiene_pdf=quote.pdf_ruta is not None,
             version_anterior_id=quote.version_anterior_id,
             aprobacion=self._approval(quote.id),
         )

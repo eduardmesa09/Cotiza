@@ -174,6 +174,7 @@ class QuoteOut(QuoteSummaryOut):
     # Lo que el usuario puede hacer ahora con la cotización; la interfaz habilita botones con esto.
     acciones_permitidas: list[str]
     puede_crear_version: bool = False
+    tiene_pdf: bool = False
     version_anterior_id: int | None = None
     aprobacion: ApprovalBrief | None = None
 
@@ -308,3 +309,27 @@ class ParameterOut(BaseModel):
 
 class ParameterIn(BaseModel):
     valor: str = Field(min_length=1, max_length=120)
+
+
+# --- Tablero de indicadores -----------------------------------------------------------
+
+
+class KpiOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    codigo: str
+    nombre: str
+    valor: float | None
+    unidad: str
+    linea_base: float | None
+    meta: float | None
+    sentido: Literal["menor", "mayor"]
+    muestra: int
+    formula: str
+
+
+class DashboardOut(BaseModel):
+    alcance: Literal["propios", "todos"]
+    generado_en: datetime
+    totales: dict[str, int]
+    indicadores: list[KpiOut]

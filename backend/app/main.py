@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.routers import auth, catalog, pricing, quotes, users, workflow
+from app.api.routers import auth, catalog, kpis, pricing, quotes, users, workflow
 from app.domain.approval import CommentRequiredError
 from app.domain.errors import (
     DomainError,
@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="COTIZA+ API",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
@@ -60,7 +60,7 @@ def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=code, content={"detail": str(exc)})
 
 
-for router in (auth.router, catalog.router, quotes.router, workflow.router, pricing.router, users.router):
+for router in (auth.router, catalog.router, quotes.router, workflow.router, kpis.router, pricing.router, users.router):
     app.include_router(router)
 
 

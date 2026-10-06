@@ -1,1 +1,39 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
+
+/* Paleta del proyecto. Cada color se usa por su función, no por su nombre. */
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand: #0086d9;
+  --color-brand-dark: #123b63;
+  --color-brand-mid: #1769aa;
+  --color-navy: #0d2942;
+  --color-accent: #f5a623;
+  --color-canvas: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-line: #e2e8f0;
+  --color-ink: #172b3a;
+  --color-muted: #64748b;
+  --color-ok: #16a34a;
+  --color-warn: #eab308;
+  --color-bad: #dc2626;
+  --color-info: #06b6d4;
+  /* Naranja de la paleta un paso más oscuro: como barra de gráfico el original es demasiado claro. */
+  --color-chart-base: #e0961a;
+
+  --shadow-card: 0 1px 2px rgb(13 41 66 / 0.04), 0 8px 24px -12px rgb(13 41 66 / 0.1);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Las cifras se alinean en columnas y no se parten entre el número y su unidad. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
