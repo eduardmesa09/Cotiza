@@ -128,3 +128,24 @@ def test_parametros_de_plazos_y_horario(seeded):
     assert params["seguimiento_minutos"] == "2880"
     assert params["vigencia_minutos"] == "10080"
     assert params["horario_habil_activo"] == "true"
+
+
+def test_las_promociones_semilla_no_dejan_el_margen_bajo_el_minimo(session):
+    """Con la categoría conocida, el descuento se limita para que ni el nivel Oro quede bajo el mínimo."""
+    products = [{"sku": DEMO_SKU, "costo": "620.00", "precio_lista": "800.00", "categoria": "Portátiles"}]
+    # Margen bruto de 15 % a 24 % en Periféricos (mínimo 12 %): varias no admiten promoción alguna.
+    for i in range(100):
+        lista = Decimal("100.00")
+        costo = lista * (Decimal("0.85") - Decimal(i % 10) / 100)
+        products.append({"sku": f"PER-{i:03d}", "costo": str(costo), "precio_lista": str(lista), "categoria": "Periféricos"})
+    seed_all(session, products, NOW)
+
+    by_sku = {p["sku"]: p for p in products}
+    promos = [p for p in session.scalars(select(Promocion)) if p.referencia != DEMO_SKU]
+    assert len(promos) >= 20
+    for promo in promos:
+        product = by_sku[promo.referencia]
+        precio = Decimal(product["precio_lista"]) * Decimal("0.94") * (1 - promo.descuento)  # canal Oro
+        margen = (precio - Decimal(product["costo"])) / precio
+        assert margen >= Decimal("0.12"), (promo.referencia, promo.descuento, margen)
+        assert promo.descuento >= Decimal("0.02")

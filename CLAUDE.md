@@ -162,6 +162,12 @@ Toda otra transición lanza un error de dominio. Cada transición registra un ev
 - En las barras del tablero, la línea base usa `chart-base` (`#E0961A`), un paso más oscuro que el naranja de la paleta, que como barra es demasiado claro. Un indicador sin meta (K10) muestra la variación sin calificarla.
 - Pruebas: `src/test/helpers.tsx` trae `mockApi` (simula `fetch` por ruta), `renderApp` y datos de ejemplo (`quote()`, `line()`, `kpi()`).
 
+### Demo y cierre (Fase 7)
+
+- `infra/demo.py` (`python -m app.infra.demo`, o `make demo`): recrea unas tres semanas de operación ejecutando los casos de uso reales con un `SettableClock`. Cada cotización es un generador que cede el momento de su siguiente paso; el simulador los ejecuta en orden cronológico y procesa los plazos antes de cada paso. Solo corre sobre una base sin cotizaciones. Crea el usuario `ejecutivo2`.
+- Las promociones semilla se limitan para que, aun con nivel Oro, no dejen el margen bajo el mínimo de la categoría: una cotización estándar no debe pedir aprobación solo por la promoción.
+- `README.md` es el entregable de documentación: inicio rápido, usuarios, guion de demo, arquitectura, pruebas y limitaciones. Si cambia un comando, un usuario o un parámetro de demo, actualizarlo.
+
 ### Pruebas
 
 - `tests/conftest.py` ofrece: `db` (sesión con semillas), `client` (API con ERP y reloj falsos), `erp` (`FakeErp`, catálogo en memoria), `clock` (`FakeClock`, se adelanta con `clock.advance(minutes=5)`), `as_user("ejecutivo")` (cabeceras) y `demo_channel`, `run_deadlines()` (un ciclo del planificador con el reloj de la prueba) y `notifications("gerente")`.
@@ -236,6 +242,8 @@ docker compose run --rm --no-deps -v "$PWD/backend/alembic/versions:/app/alembic
 - Referencia de demo `POR-DEMO01` (costo 620, lista 800, promoción vigente del 5 %) y canal de demo "Soluciones Andinas TI S.A.S. (demo)", nivel Plata: reproducen el caso de prueba obligatorio.
 
 ## Fases
+
+Todas terminadas.
 
 0. `CLAUDE.md`.
 1. Esqueleto, Docker Compose, BD y migraciones, `erp-mock` con datos y semillas.

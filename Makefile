@@ -1,6 +1,6 @@
 # En Windows sin make: usar scripts/test.ps1 o los comandos de docker compose directamente.
 
-.PHONY: up down clean test test-erp test-api test-frontend
+.PHONY: up down clean demo test test-erp test-api test-frontend
 
 up:
 	docker compose up --build
@@ -27,3 +27,7 @@ test-api:
 test-frontend:
 	docker compose --profile test build frontend-test
 	docker compose --profile test run --rm frontend-test
+
+# Precarga unas tres semanas de operación para que el tablero tenga datos (base limpia).
+demo:
+	docker compose exec api python -m app.infra.demo

@@ -4,6 +4,7 @@ cada tabla solo se llena si está vacía.
 Uso: python -m app.infra.seeds
 """
 
+import math
 import random
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -171,15 +172,33 @@ def seed_channels(session: Session) -> None:
             )
 
 
+def _max_promo_percent(product: dict) -> int:
+    """Mayor promoción (en puntos enteros, hasta 12) que deja el margen sobre el mínimo de la
+    categoría aun con el mejor descuento de nivel y un punto de holgura. Sin categoría conocida
+    no se limita."""
+    minimum = dict(MIN_MARGINS).get(product.get("categoria"))
+    if minimum is None:
+        return 12
+    best_level = max(Decimal(d) for _, d in LEVELS)
+    floor_price = Decimal(product["costo"]) / (1 - Decimal(minimum) - Decimal("0.01"))
+    room = 1 - floor_price / (Decimal(product["precio_lista"]) * (1 - best_level))
+    return max(min(math.floor(room * 100), 12), 0)
+
+
 def seed_promotions(session: Session, products: list[dict], today: date, now: datetime) -> None:
     """Promociones vigentes, vencidas y futuras, una por referencia (sin superposición)."""
     if not _is_empty(session, Promocion):
         return
     rng = random.Random(SEED)
     quotable = sorted(
-        p["sku"] for p in products if p["costo"] is not None and p["precio_lista"] is not None and p["sku"] != DEMO_SKU
+        (p for p in products if p["costo"] is not None and p["precio_lista"] is not None and p["sku"] != DEMO_SKU),
+        key=lambda p: p["sku"],
     )
-    chosen = rng.sample(quotable, k=min(60, len(quotable)))
+    rng.shuffle(quotable)
+    # Solo referencias cuyo margen admite una promoción de al menos 2 %: una promoción de
+    # fabricante no debería, por sí sola, dejar la cotización pendiente de aprobación.
+    limits = {p["sku"]: _max_promo_percent(p) for p in quotable}
+    chosen = [p["sku"] for p in quotable if limits[p["sku"]] >= 2][:60]
 
     def add(sku: str, discount: str, start: date, end: date, name: str | None = None) -> None:
         session.add(
@@ -193,8 +212,8 @@ def seed_promotions(session: Session, products: list[dict], today: date, now: da
             )
         )
 
-    def discount() -> str:
-        return f"0.{rng.randint(3, 12):02d}"
+    def discount(sku: str) -> str:
+        return f"0.{min(rng.randint(3, 12), limits[sku]):02d}"
 
     # La promoción del 5 % del ejemplo del informe, vigente con holgura.
     if any(p["sku"] == DEMO_SKU for p in products):
@@ -202,13 +221,13 @@ def seed_promotions(session: Session, products: list[dict], today: date, now: da
 
     for i, sku in enumerate(chosen):
         if i < 35:  # vigentes; algunas terminan pronto para que acoten la vigencia (RN-11)
-            add(sku, discount(), today - timedelta(days=rng.randint(1, 30)), today + timedelta(days=rng.randint(2, 45)))
+            add(sku, discount(sku), today - timedelta(days=rng.randint(1, 30)), today + timedelta(days=rng.randint(2, 45)))
         elif i < 50:  # vencidas: el motor debe descartarlas (RN-04)
             end = today - timedelta(days=rng.randint(1, 60))
-            add(sku, discount(), end - timedelta(days=rng.randint(10, 40)), end)
+            add(sku, discount(sku), end - timedelta(days=rng.randint(10, 40)), end)
         else:  # futuras: todavía no aplican
             start = today + timedelta(days=rng.randint(3, 30))
-            add(sku, discount(), start, start + timedelta(days=rng.randint(10, 40)))
+            add(sku, discount(sku), start, start + timedelta(days=rng.randint(10, 40)))
 
 
 def seed_all(session: Session, products: list[dict], now: datetime) -> dict[str, int]:
