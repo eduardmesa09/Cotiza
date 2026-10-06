@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.domain.events import Event, EventType
-from app.domain.parties import Channel
-from app.infra.models import Canal, Evento, Notificacion
+from app.domain.parties import Channel, Role
+from app.infra.models import Canal, Evento, Notificacion, Usuario
 
 
 class SqlCustomerAdapter:
@@ -85,3 +85,17 @@ class SqlNotificationAdapter:
             Notificacion(usuario_id=usuario_id, tipo=tipo, mensaje=mensaje, cotizacion_id=cotizacion_id, leida=False, creada_en=ahora)
         )
         self.session.flush()
+
+
+class SqlUserDirectory:
+    """UserDirectoryPort: usuarios activos por rol, para dirigir las notificaciones."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def ids_with_role(self, rol: Role) -> Sequence[int]:
+        return list(
+            self.session.scalars(
+                select(Usuario.id).where(Usuario.rol == rol, Usuario.activo.is_(True)).order_by(Usuario.id)
+            )
+        )

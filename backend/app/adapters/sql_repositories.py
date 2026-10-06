@@ -9,8 +9,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.domain.approval import ApprovalRequest, ApprovalStatus
 from app.domain.business_time import BusinessCalendar
 from app.domain.errors import PricingConfigError
+from app.domain.followup import FollowUpTask, TaskOutcome, TaskStatus
 from app.domain.pricing_engine import (
     AppliedRule,
     Evaluation,
@@ -32,6 +34,7 @@ from app.infra.models import (
     Parametro,
     Promocion,
     SolicitudAprobacion,
+    TareaSeguimiento,
 )
 
 # --- Cotizaciones ---------------------------------------------------------------------
@@ -214,6 +217,156 @@ class SqlQuoteRepository:
                 Cotizacion.vigente_hasta > ahora,
             )
         )
+
+    def _current_committing(self):
+        return (
+            select(Cotizacion)
+            .where(Cotizacion.estado.in_(COMMITTING_STATES), Cotizacion.reemplazada.is_(False))
+            .order_by(Cotizacion.id)
+        )
+
+    def list_expired(self, ahora: datetime) -> Sequence[Quote]:
+        rows = self.session.scalars(self._current_committing().where(Cotizacion.vigente_hasta <= ahora))
+        return [self._to_domain(row) for row in rows]
+
+    def list_due_follow_up(self, ahora: datetime) -> Sequence[Quote]:
+        rows = self.session.scalars(
+            self._current_committing().where(
+                Cotizacion.proximo_seguimiento_en <= ahora, Cotizacion.vigente_hasta > ahora
+            )
+        )
+        return [self._to_domain(row) for row in rows]
+
+
+# --- Aprobaciones y seguimiento -------------------------------------------------------
+
+_APPROVAL_FIELDS = (
+    "cotizacion_id",
+    "solicitante_id",
+    "solicitada_en",
+    "vence_en",
+    "escalada",
+    "escalada_en",
+    "resuelta_en",
+    "resuelta_por_id",
+    "comentario",
+)
+
+
+class SqlApprovalRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    @staticmethod
+    def _to_domain(row: SolicitudAprobacion) -> ApprovalRequest:
+        return ApprovalRequest(
+            id=row.id, estado=ApprovalStatus(row.estado), **{f: getattr(row, f) for f in _APPROVAL_FIELDS}
+        )
+
+    @staticmethod
+    def _copy(request: ApprovalRequest, row: SolicitudAprobacion) -> None:
+        for field in _APPROVAL_FIELDS:
+            setattr(row, field, getattr(request, field))
+        row.estado = request.estado
+
+    def add(self, request: ApprovalRequest) -> ApprovalRequest:
+        row = SolicitudAprobacion()
+        self._copy(request, row)
+        self.session.add(row)
+        self.session.flush()
+        request.id = row.id
+        return request
+
+    def get(self, request_id: int) -> ApprovalRequest | None:
+        row = self.session.get(SolicitudAprobacion, request_id)
+        return self._to_domain(row) if row else None
+
+    def save(self, request: ApprovalRequest) -> None:
+        self._copy(request, self.session.get(SolicitudAprobacion, request.id))
+        self.session.flush()
+
+    def latest_for_quote(self, quote_id: int) -> ApprovalRequest | None:
+        row = self.session.scalar(
+            select(SolicitudAprobacion)
+            .where(SolicitudAprobacion.cotizacion_id == quote_id)
+            .order_by(SolicitudAprobacion.id.desc())
+            .limit(1)
+        )
+        return self._to_domain(row) if row else None
+
+    def _pending(self):
+        return (
+            select(SolicitudAprobacion)
+            .where(SolicitudAprobacion.estado == ApprovalStatus.PENDIENTE)
+            .order_by(SolicitudAprobacion.solicitada_en, SolicitudAprobacion.id)
+        )
+
+    def list_pending(self, solo_escaladas: bool = False) -> Sequence[ApprovalRequest]:
+        query = self._pending()
+        if solo_escaladas:
+            query = query.where(SolicitudAprobacion.escalada.is_(True))
+        return [self._to_domain(row) for row in self.session.scalars(query)]
+
+    def list_overdue(self, ahora: datetime) -> Sequence[ApprovalRequest]:
+        query = self._pending().where(SolicitudAprobacion.escalada.is_(False), SolicitudAprobacion.vence_en <= ahora)
+        return [self._to_domain(row) for row in self.session.scalars(query)]
+
+
+_TASK_FIELDS = ("cotizacion_id", "ejecutivo_id", "creada_en", "cerrada_en", "nota")
+
+
+class SqlFollowUpRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    @staticmethod
+    def _to_domain(row: TareaSeguimiento) -> FollowUpTask:
+        return FollowUpTask(
+            id=row.id,
+            estado=TaskStatus(row.estado),
+            resultado=TaskOutcome(row.resultado) if row.resultado else None,
+            **{f: getattr(row, f) for f in _TASK_FIELDS},
+        )
+
+    @staticmethod
+    def _copy(task: FollowUpTask, row: TareaSeguimiento) -> None:
+        for field in _TASK_FIELDS:
+            setattr(row, field, getattr(task, field))
+        row.estado = task.estado
+        row.resultado = task.resultado
+
+    def add(self, task: FollowUpTask) -> FollowUpTask:
+        row = TareaSeguimiento()
+        self._copy(task, row)
+        self.session.add(row)
+        self.session.flush()
+        task.id = row.id
+        return task
+
+    def get(self, task_id: int) -> FollowUpTask | None:
+        row = self.session.get(TareaSeguimiento, task_id)
+        return self._to_domain(row) if row else None
+
+    def save(self, task: FollowUpTask) -> None:
+        self._copy(task, self.session.get(TareaSeguimiento, task.id))
+        self.session.flush()
+
+    def _pending(self):
+        return (
+            select(TareaSeguimiento)
+            .where(TareaSeguimiento.estado == TaskStatus.PENDIENTE)
+            .order_by(TareaSeguimiento.creada_en, TareaSeguimiento.id)
+        )
+
+    def list_pending(self, ejecutivo_id: int | None = None) -> Sequence[FollowUpTask]:
+        query = self._pending()
+        if ejecutivo_id is not None:
+            query = query.where(TareaSeguimiento.ejecutivo_id == ejecutivo_id)
+        return [self._to_domain(row) for row in self.session.scalars(query)]
+
+    def pending_for_quote(self, quote_id: int) -> Sequence[FollowUpTask]:
+        query = self._pending().where(TareaSeguimiento.cotizacion_id == quote_id)
+        return [self._to_domain(row) for row in self.session.scalars(query)]
 
 
 # --- Parámetros comerciales -----------------------------------------------------------

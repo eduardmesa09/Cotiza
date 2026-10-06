@@ -6,7 +6,7 @@ perder precisión en JSON.
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
@@ -156,10 +156,78 @@ class QuoteSummaryOut(BaseModel):
     lineas_count: int
 
 
+class ApprovalBrief(BaseModel):
+    """Última solicitud de aprobación de la cotización."""
+
+    id: int
+    estado: str
+    solicitada_en: datetime
+    vence_en: datetime
+    escalada: bool
+    resuelta_en: datetime | None
+    resuelta_por: str | None
+    comentario: str | None
+
+
 class QuoteOut(QuoteSummaryOut):
     lineas: list[LineOut]
     # Lo que el usuario puede hacer ahora con la cotización; la interfaz habilita botones con esto.
     acciones_permitidas: list[str]
+    puede_crear_version: bool = False
+    version_anterior_id: int | None = None
+    aprobacion: ApprovalBrief | None = None
+
+
+class CloseIn(BaseModel):
+    resultado: Literal["GANADA", "PERDIDA"]
+    nota: str | None = Field(default=None, max_length=1000)
+
+
+# --- Aprobaciones, seguimiento y notificaciones ---------------------------------------
+
+
+class ResolutionIn(BaseModel):
+    # Obligatorio: el dominio rechaza un comentario vacío.
+    comentario: str = Field(default="", max_length=2000)
+
+
+class ApprovalQueueOut(BaseModel):
+    id: int
+    solicitada_en: datetime
+    vence_en: datetime
+    escalada: bool
+    escalada_en: datetime | None
+    sla_restante_segundos: int
+    sla_vencido: bool
+    solicitante: str | None
+    cotizacion: QuoteOut
+
+
+class TaskOut(BaseModel):
+    id: int
+    creada_en: datetime
+    cotizacion: QuoteSummaryOut
+
+
+class TaskResolutionIn(BaseModel):
+    accion: Literal["GANADA", "PERDIDA", "MANTENER"]
+    nota: str | None = Field(default=None, max_length=1000)
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tipo: str
+    mensaje: str
+    cotizacion_id: int | None
+    leida: bool
+    creada_en: datetime
+
+
+class NotificationListOut(BaseModel):
+    no_leidas: int
+    items: list[NotificationOut]
 
 
 class EventOut(BaseModel):

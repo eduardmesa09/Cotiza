@@ -128,9 +128,21 @@ Toda otra transición lanza un error de dominio. Cada transición registra un ev
 - En la API los porcentajes viajan como fracción (`0.04` = 4 %) y los importes como texto decimal (`"729.60"`).
 - La caducidad del JWT usa la hora real del sistema, no `ClockPort`.
 
+### Después de emitir (Fase 4)
+
+- `application/approvals.py` (`ApprovalService`): solicitar, cola, aprobar o rechazar, escalar. `application/followup.py` (`FollowUpService`): tareas, cerrar como ganada o perdida, mantener en seguimiento, nueva versión, vencer. `application/deadlines.py` (`DeadlineService.process`): un ciclo de plazos, idempotente.
+- `infra/scheduler.py`: APScheduler llama a `DeadlineService.process` cada `planificador_intervalo_segundos` (se lee al arrancar). Se apaga con `SCHEDULER_ENABLED=false`; las pruebas lo apagan y usan la fixture `run_deadlines`.
+- `infra/container.py` es el único lugar que decide qué adaptador implementa cada puerto.
+- Cola de aprobaciones: el aprobador ve todas las pendientes; el gerente, solo las escaladas. Ambos pueden resolver cualquiera. Orden: antigüedad y luego monto.
+- `acciones_permitidas` son las transiciones posibles de la máquina de estados, sin filtrar por rol; la interfaz combina eso con el rol del usuario.
+- Una versión reemplazada conserva su estado (`EMITIDA` o `EN_SEGUIMIENTO`) con `reemplazada = true`: no compromete inventario, no genera seguimiento ni vence, y no admite más acciones.
+- Al cerrarse (ganada, perdida o vencida) la cotización deja de comprometer inventario; `cantidad_comprometida` se conserva en la línea como registro.
+- Rutas nuevas: `POST /cotizaciones/{id}/solicitar-aprobacion | cerrar | nueva-version`, `GET /aprobaciones`, `POST /aprobaciones/{id}/aprobar | rechazar`, `GET /seguimiento`, `POST /seguimiento/{id}/resolver`, `GET /notificaciones`.
+- Para la demo: bajar `sla_aprobacion_minutos`, `seguimiento_minutos` y `vigencia_minutos` y poner `horario_habil_activo` en `false` desde la administración de parámetros.
+
 ### Pruebas
 
-- `tests/conftest.py` ofrece: `db` (sesión con semillas), `client` (API con ERP y reloj falsos), `erp` (`FakeErp`, catálogo en memoria), `clock` (`FakeClock`, se adelanta con `clock.advance(minutes=5)`), `as_user("ejecutivo")` (cabeceras) y `demo_channel`.
+- `tests/conftest.py` ofrece: `db` (sesión con semillas), `client` (API con ERP y reloj falsos), `erp` (`FakeErp`, catálogo en memoria), `clock` (`FakeClock`, se adelanta con `clock.advance(minutes=5)`), `as_user("ejecutivo")` (cabeceras) y `demo_channel`, `run_deadlines()` (un ciclo del planificador con el reloj de la prueba) y `notifications("gerente")`.
 - `tests/helpers.py` tiene atajos: `create_quote`, `calculate`, `issue`, `create_calculated`, `line`.
 - `tests/scenarios/` tiene un archivo por escenario E1–E10; recorren la API completa.
 - Tras un `session.commit()` del código probado, los datos de la prueba siguen ahí: la sesión usa savepoints y todo se revierte al final.

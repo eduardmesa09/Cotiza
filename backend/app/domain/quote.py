@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
-from app.domain.errors import InvalidLineError
+from app.domain.errors import InvalidLineError, InvalidTransitionError
 from app.domain.pricing_engine import (
     ONE,
     ZERO,
@@ -15,6 +15,7 @@ from app.domain.pricing_engine import (
     quote_total,
 )
 from app.domain.state_machine import (
+    COMMITTING_STATES,
     Action,
     QuoteState,
     TransitionContext,
@@ -101,6 +102,8 @@ class Quote:
 
     @property
     def acciones_permitidas(self) -> frozenset[Action]:
+        if self.reemplazada:
+            return frozenset()
         return allowed_actions(self.estado, self.contexto)
 
     def _transition(self, accion: Action) -> None:
@@ -151,3 +154,83 @@ class Quote:
         self.emitida_en = ahora
         self.vigente_hasta = vigente_hasta
         self.proximo_seguimiento_en = proximo_seguimiento_en
+
+    # --- Aprobación (RN-07, RN-09) -----------------------------------------------------
+
+    def solicitar_aprobacion(self) -> None:
+        self._transition(Action.SOLICITAR_APROBACION)
+
+    def aprobar(self) -> None:
+        """No cambia el estado: la emisión la confirma después el ejecutivo."""
+        self._transition(Action.APROBAR)
+        self.aprobada = True
+
+    def rechazar(self) -> None:
+        """Vuelve a CALCULADA para que el ejecutivo ajuste el descuento."""
+        self._transition(Action.RECHAZAR)
+
+    def escalar(self) -> None:
+        self._transition(Action.ESCALAR)
+
+    # --- Seguimiento y cierre (RN-12) --------------------------------------------------
+
+    def _ensure_current(self) -> None:
+        if self.reemplazada:
+            raise InvalidTransitionError("Esta versión fue reemplazada por una más reciente")
+
+    def iniciar_seguimiento(self) -> None:
+        self._ensure_current()
+        self._transition(Action.INICIAR_SEGUIMIENTO)
+        self.proximo_seguimiento_en = None
+
+    def mantener_en_seguimiento(self, proximo_seguimiento_en: datetime) -> None:
+        self._ensure_current()
+        if self.estado is not QuoteState.EN_SEGUIMIENTO:
+            raise InvalidTransitionError("Solo una cotización en seguimiento puede mantenerse en seguimiento")
+        self.proximo_seguimiento_en = proximo_seguimiento_en
+
+    def _close(self, accion: Action, ahora: datetime) -> None:
+        self._ensure_current()
+        self._transition(accion)
+        self.cerrada_en = ahora
+        self.proximo_seguimiento_en = None
+
+    def ganar(self, ahora: datetime) -> None:
+        self._close(Action.GANAR, ahora)
+
+    def perder(self, ahora: datetime) -> None:
+        self._close(Action.PERDER, ahora)
+
+    def vencer(self, ahora: datetime) -> None:
+        """Vigencia cumplida sin orden. Al salir de un estado vigente deja de comprometer inventario."""
+        self._close(Action.VENCER, ahora)
+
+    # --- Versiones (RN-13) -------------------------------------------------------------
+
+    @property
+    def puede_versionarse(self) -> bool:
+        return self.estado in COMMITTING_STATES and not self.reemplazada
+
+    def nueva_version(self, ahora: datetime) -> "Quote":
+        """Una cotización emitida no se modifica: se reemplaza por una versión nueva.
+
+        Esta versión conserva sus precios congelados y queda marcada como reemplazada, con lo
+        que deja de comprometer inventario. La nueva nace en BORRADOR, con las mismas líneas
+        sin calcular, para recalcularse completa con los datos vigentes.
+        """
+        if not self.puede_versionarse:
+            raise InvalidTransitionError(
+                "Solo una cotización emitida y vigente, que no haya sido reemplazada, admite una nueva versión"
+            )
+        self.reemplazada = True
+        self.proximo_seguimiento_en = None
+        return Quote(
+            canal_id=self.canal_id,
+            ejecutivo_id=self.ejecutivo_id,
+            recibida_en=ahora,  # la solicitud de cambio llega ahora
+            creada_en=ahora,
+            lineas=[QuoteLine(l.referencia, l.cantidad, l.descuento_adicional) for l in self.lineas],
+            numero=self.numero,
+            version=self.version + 1,
+            version_anterior_id=self.id,
+        )

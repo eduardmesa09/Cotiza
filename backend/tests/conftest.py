@@ -12,6 +12,7 @@ import os
 
 # Antes de importar la aplicación: bcrypt con costo mínimo para que las pruebas sean rápidas.
 os.environ.setdefault("BCRYPT_ROUNDS", "4")
+os.environ.setdefault("SCHEDULER_ENABLED", "false")
 
 from collections.abc import Callable, Iterator
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_catalog, get_clock, get_inventory
 from app.domain.pricing_engine import ProductData
+from app.application.deadlines import DeadlineReport
+from app.infra.container import build_deadline_service
 from app.infra.db import get_session
 from app.infra.models import Canal, Usuario
 from app.infra.security import create_access_token
@@ -182,3 +185,25 @@ def as_user(db: Session) -> Callable[[str], dict]:
 def demo_channel(db: Session) -> Canal:
     """Canal de nivel Plata del ejemplo del informe."""
     return db.scalars(select(Canal).where(Canal.nit == DEMO_CHANNEL_NIT)).one()
+
+
+@pytest.fixture
+def run_deadlines(session: Session, clock: FakeClock) -> Callable[[], DeadlineReport]:
+    """Ejecuta un ciclo del planificador con el reloj de la prueba."""
+
+    def run() -> DeadlineReport:
+        report = build_deadline_service(session, clock).process()
+        session.commit()
+        return report
+
+    return run
+
+
+@pytest.fixture
+def notifications(client: TestClient, as_user) -> Callable[[str], list[dict]]:
+    """Notificaciones de un usuario semilla, la más reciente primero."""
+
+    def of(usuario: str) -> list[dict]:
+        return client.get("/api/notificaciones", headers=as_user(usuario)).json()["items"]
+
+    return of

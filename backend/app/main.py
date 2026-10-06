@@ -1,9 +1,12 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.routers import auth, catalog, pricing, quotes, users
+from app.api.routers import auth, catalog, pricing, quotes, users, workflow
+from app.domain.approval import CommentRequiredError
 from app.domain.errors import (
     DomainError,
     ExternalServiceError,
@@ -14,10 +17,27 @@ from app.domain.errors import (
 )
 from app.domain.promotions import InvalidPromotionError
 from app.infra.db import get_session
+from app.infra.settings import get_settings
+
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Arranca el planificador de plazos junto con la API y lo detiene al apagar."""
+    scheduler = None
+    if get_settings().scheduler_enabled:
+        from app.infra.scheduler import start_scheduler
+
+        scheduler = start_scheduler()
+    yield
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
+
 
 app = FastAPI(
     title="COTIZA+ API",
-    version="0.3.0",
+    version="0.4.0",
+    lifespan=lifespan,
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
 )
@@ -29,6 +49,7 @@ ERROR_STATUS: dict[type[DomainError], int] = {
     InvalidTransitionError: status.HTTP_409_CONFLICT,
     InvalidLineError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     InvalidPromotionError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    CommentRequiredError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     ExternalServiceError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
@@ -39,7 +60,7 @@ def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=code, content={"detail": str(exc)})
 
 
-for router in (auth.router, catalog.router, quotes.router, pricing.router, users.router):
+for router in (auth.router, catalog.router, quotes.router, workflow.router, pricing.router, users.router):
     app.include_router(router)
 
 

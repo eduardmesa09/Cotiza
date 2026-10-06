@@ -6,6 +6,7 @@ Orquestan el dominio y hablan con el exterior solo por puertos. No conocen HTTP 
 from collections.abc import Sequence
 from datetime import datetime
 
+from app.application.access import can_view, load_own_quote, load_quote, require_executive
 from app.domain.deadlines import follow_up_due, valid_until
 from app.domain.errors import InvalidLineError, NotFoundError, PermissionDeniedError
 from app.domain.events import Event, EventType
@@ -36,25 +37,10 @@ class QuoteService:
         self.events = events
         self.clock = clock
 
-    # --- Permisos (Tabla 32) -----------------------------------------------------------
-
-    @staticmethod
-    def _require_executive(actor: Actor) -> None:
-        if actor.rol is not Role.EJECUTIVO:
-            raise PermissionDeniedError("Solo un ejecutivo de cuenta puede crear, editar y emitir cotizaciones")
-
-    def _load(self, quote_id: int) -> Quote:
-        quote = self.quotes.get(quote_id)
-        if quote is None:
-            raise NotFoundError(f"La cotización {quote_id} no existe")
-        return quote
+    # --- Acceso (Tabla 32) -------------------------------------------------------------
 
     def _load_own(self, actor: Actor, quote_id: int) -> Quote:
-        self._require_executive(actor)
-        quote = self._load(quote_id)
-        if quote.ejecutivo_id != actor.id:
-            raise PermissionDeniedError("Solo puede modificar sus propias cotizaciones")
-        return quote
+        return load_own_quote(self.quotes, actor, quote_id)
 
     def _require_channel(self, canal_id: int) -> None:
         if self.customers.get(canal_id) is None:
@@ -63,12 +49,10 @@ class QuoteService:
     # --- Consultas ---------------------------------------------------------------------
 
     def get(self, actor: Actor, quote_id: int) -> Quote:
-        quote = self._load(quote_id)
-        if actor.rol is Role.EJECUTIVO and quote.ejecutivo_id == actor.id:
-            return quote
-        if actor.rol in ROLES_THAT_SEE_ALL_QUOTES:
-            return quote
-        raise PermissionDeniedError("No tiene permiso para consultar esta cotización")
+        quote = load_quote(self.quotes, quote_id)
+        if not can_view(actor, quote):
+            raise PermissionDeniedError("No tiene permiso para consultar esta cotización")
+        return quote
 
     def list(self, actor: Actor, estado: QuoteState | None = None) -> Sequence[Quote]:
         if actor.rol is Role.EJECUTIVO:
@@ -84,7 +68,7 @@ class QuoteService:
     # --- Crear y editar ----------------------------------------------------------------
 
     def create(self, actor: Actor, canal_id: int, recibida_en: datetime, lineas: Sequence[QuoteLine]) -> Quote:
-        self._require_executive(actor)
+        require_executive(actor)
         self._require_channel(canal_id)
         ahora = self.clock.now()
         quote = self.quotes.add(Quote.nueva(canal_id, actor.id, recibida_en, ahora, lineas))

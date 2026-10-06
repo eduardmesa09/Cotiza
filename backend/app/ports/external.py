@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Protocol
 
 from app.domain.events import Event, EventType
-from app.domain.parties import Channel
+from app.domain.parties import Channel, Role
 from app.domain.pricing_engine import ProductData
 
 
@@ -72,3 +72,9 @@ class ClockPort(Protocol):
     """Única fuente de la hora actual, para que los plazos sean verificables en pruebas."""
 
     def now(self) -> datetime: ...
+
+
+class UserDirectoryPort(Protocol):
+    """A quién avisar: usuarios activos por rol."""
+
+    def ids_with_role(self, rol: Role) -> Sequence[int]: ...

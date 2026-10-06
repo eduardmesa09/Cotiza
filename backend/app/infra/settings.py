@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "solo-para-demo-cambiar-en-produccion"
     jwt_expire_minutes: int = 480
     storage_dir: str = "./storage"
+    # El planificador de plazos corre dentro de la API; las pruebas lo apagan.
+    scheduler_enabled: bool = True
     # Costo de bcrypt. Las pruebas lo bajan para no gastar segundos en cada contraseña.
     bcrypt_rounds: int = 12
 

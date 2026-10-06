@@ -15,10 +15,12 @@ from sqlalchemy.orm import Session
 
 from app.adapters.clock import SystemClock
 from app.adapters.erp_http import ErpHttpAdapter
-from app.adapters.sql_misc import SqlCustomerAdapter, SqlEventAdapter
-from app.adapters.sql_repositories import SqlPricingRepository, SqlQuoteRepository
+from app.adapters.sql_misc import SqlCustomerAdapter
+from app.application.approvals import ApprovalService
+from app.application.followup import FollowUpService
 from app.application.quotes import QuoteService
 from app.domain.parties import Actor, Role
+from app.infra.container import build_approval_service, build_followup_service, build_quote_service
 from app.infra.db import get_session
 from app.infra.models import Usuario
 from app.infra.security import decode_access_token
@@ -58,15 +60,19 @@ def get_quote_service(
     inventory: InventoryPort = Depends(get_inventory),
     clock: ClockPort = Depends(get_clock),
 ) -> QuoteService:
-    return QuoteService(
-        quotes=SqlQuoteRepository(session),
-        pricing=SqlPricingRepository(session),
-        catalog=catalog,
-        inventory=inventory,
-        customers=SqlCustomerAdapter(session),
-        events=SqlEventAdapter(session),
-        clock=clock,
-    )
+    return build_quote_service(session, catalog, inventory, clock)
+
+
+def get_approval_service(
+    session: Session = Depends(get_session), clock: ClockPort = Depends(get_clock)
+) -> ApprovalService:
+    return build_approval_service(session, clock)
+
+
+def get_followup_service(
+    session: Session = Depends(get_session), clock: ClockPort = Depends(get_clock)
+) -> FollowUpService:
+    return build_followup_service(session, clock)
 
 
 # --- Autenticación y roles ------------------------------------------------------------
