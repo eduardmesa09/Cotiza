@@ -244,7 +244,7 @@ describe("nueva cotización", () => {
     await userEvent.selectOptions(screen.getByLabelText("Canal"), "3");
     await userEvent.type(screen.getByRole("combobox", { name: /buscar referencia/i }), "demo");
     // La referencia no cotizable se muestra marcada.
-    expect(await screen.findByText("No cotizable")).toBeInTheDocument();
+    expect(await within(await screen.findByRole("listbox")).findByText("No cotizable")).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("option", { name: /POR-DEMO01/ }));
     const quantity = screen.getByLabelText("Cantidad de POR-DEMO01");
     await userEvent.clear(quantity);
@@ -256,6 +256,35 @@ describe("nueva cotización", () => {
     const created = calls.find((c) => c.method === "POST" && c.path === "/cotizaciones");
     expect(created?.body).toMatchObject({ canal_id: 3, lineas: [{ referencia: "POR-DEMO01", cantidad: 20, descuento_adicional: "0.0000" }] });
     expect(screen.getByRole("button", { name: "Emitir" })).toBeEnabled();
+  });
+
+  it("muestra todo el catálogo separado por categoría y permite agregar desde ahí", async () => {
+    session("ejecutivo", {
+      "GET /catalogo": [
+        { referencia: "POR-DEMO01", descripcion: "Portátil empresarial (demo)", categoria: "Portátiles", costo: "620.00", precio_lista: "800.00", cotizable: true },
+        { referencia: "POR-00002", descripcion: "Portátil ultraliviano", categoria: "Portátiles", costo: "700.00", precio_lista: "900.00", cotizable: true },
+        { referencia: "IMP-00001", descripcion: "Impresora láser", categoria: "Impresión", costo: "70.00", precio_lista: "90.00", cotizable: true },
+        { referencia: "IMP-00009", descripcion: "Impresora sin costo", categoria: "Impresión", costo: null, precio_lista: "95.00", cotizable: false },
+      ],
+    });
+    renderApp(<AppRoutes />, "/cotizaciones/nueva");
+
+    // Una pestaña por categoría, con su número de referencias; la primera queda abierta.
+    const tabs = await screen.findAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["Impresión 2", "Portátiles 2"]);
+    const panel = screen.getByRole("tabpanel");
+    expect(within(panel).getByText("Impresora láser")).toBeInTheDocument();
+    expect(within(panel).getByText("No cotizable")).toBeInTheDocument();
+    expect(within(panel).queryByText("Portátil ultraliviano")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: /Portátiles/ }));
+    expect(within(screen.getByRole("tabpanel")).getByText("Portátil ultraliviano")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Agregar POR-DEMO01" }));
+    expect(screen.getByLabelText("Cantidad de POR-DEMO01")).toHaveValue(1);
+    // Ya agregada: no se puede repetir.
+    expect(screen.queryByRole("button", { name: "Agregar POR-DEMO01" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("tabpanel")).getByText("Ya agregada")).toBeInTheDocument();
   });
 });
 

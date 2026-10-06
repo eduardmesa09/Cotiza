@@ -2,6 +2,7 @@ import { ArrowLeft, Calculator, CopyPlus, Download, FileCheck2, Send, ThumbsDown
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useUser } from "../auth/AuthContext";
+import { CatalogBrowser } from "../components/CatalogBrowser";
 import { LinesTable, type ViewLine } from "../components/LinesTable";
 import { ProductSearch } from "../components/ProductSearch";
 import { QuoteHistory } from "../components/QuoteHistory";
@@ -225,7 +226,8 @@ export function QuotePage() {
       )}
       {quote && <ApprovalStatus quote={quote} />}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+      {/* Editable: catálogo y líneas lado a lado, datos e historial debajo. En lectura: líneas y columna lateral. */}
+      <div className={editable ? "space-y-5" : "grid gap-5 xl:grid-cols-[1fr_340px]"}>
         <div className="space-y-5">
           {editable && (
             <Card>
@@ -248,7 +250,16 @@ export function QuotePage() {
             </Card>
           )}
 
-          <Card>
+          <div className={editable ? "grid items-start gap-5 xl:grid-cols-[380px_minmax(0,1fr)]" : undefined}>
+          {editable && (
+            // Fijo bajo la cabecera: sigue a la vista aunque la lista de líneas crezca.
+            <Card className="xl:sticky xl:top-20">
+              <SectionTitle>Catálogo de productos</SectionTitle>
+              <CatalogBrowser onSelect={addProduct} exclude={draft.lines.map((l) => l.referencia)} />
+            </Card>
+          )}
+
+          <Card className="min-w-0">
             <SectionTitle aside={quote?.total != null && !dirty && <span className="nums text-2xl font-semibold">{formatMoney(quote.total)}</span>}>
               Líneas
             </SectionTitle>
@@ -258,7 +269,7 @@ export function QuotePage() {
               </div>
             )}
             {draft.lines.length === 0 ? (
-              <EmptyState title="Aún no hay líneas">Busque una referencia por código o descripción para agregarla.</EmptyState>
+              <EmptyState title="Aún no hay líneas">Elija una referencia del catálogo o búsquela por código o descripción.</EmptyState>
             ) : (
               <LinesTable
                 lines={draft.lines}
@@ -312,10 +323,11 @@ export function QuotePage() {
               </div>
             )}
           </Card>
+          </div>
         </div>
 
         {quote && (
-          <div className="space-y-5">
+          <div className={editable ? "grid items-start gap-5 md:grid-cols-2" : "space-y-5"}>
             <Card>
               <SectionTitle>Datos</SectionTitle>
               <dl className="space-y-2 text-sm">

@@ -256,6 +256,16 @@ def test_el_buscador_marca_las_referencias_no_cotizables(client, as_user):
     assert resultado[0]["costo"] is None
 
 
+def test_sin_texto_y_con_limite_amplio_devuelve_el_catalogo_completo(client, as_user, erp):
+    for i in range(60):
+        erp.add(f"IMP-9{i:03d}", "Impresión", "50.00", "60.00")
+    ejecutivo = as_user("ejecutivo")
+    completo = client.get("/api/catalogo", params={"limite": 1000}, headers=ejecutivo).json()
+    assert len(completo) == len(erp.products)
+    assert {p["categoria"] for p in completo} >= {"Impresión", "Redes", "Periféricos"}
+    assert client.get("/api/catalogo", params={"limite": 1001}, headers=ejecutivo).status_code == 422
+
+
 def test_listado_de_canales_con_su_nivel(client, as_user):
     canales = client.get("/api/canales", headers=as_user("ejecutivo")).json()
     assert len(canales) == 40
