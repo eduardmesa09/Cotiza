@@ -114,6 +114,8 @@ export interface Quote extends QuoteSummary {
   puede_crear_version: boolean;
   tiene_pdf: boolean;
   version_anterior_id: number | null;
+  /** Solo en una versión reemplazada: la que la sustituyó. */
+  version_siguiente_id?: number | null;
   aprobacion: ApprovalBrief | null;
 }
 

@@ -1,4 +1,4 @@
-import { ArrowLeft, Calculator, CopyPlus, Download, FileCheck2, Send, ThumbsDown, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calculator, CopyPlus, Download, FileCheck2, Send, ThumbsDown, Trophy } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useUser } from "../auth/AuthContext";
@@ -220,7 +220,17 @@ export function QuotePage() {
 
       <ErrorNotice message={error} onClose={() => setError(null)} />
       {quote?.reemplazada && (
-        <Notice tone="info" title="Esta versión fue reemplazada">
+        <Notice
+          tone="info"
+          title="Esta versión fue reemplazada"
+          action={
+            quote.version_siguiente_id && (
+              <Button variant="primary" size="sm" className="self-center" icon={<ArrowRight className="size-4" />} onClick={() => navigate(`/cotizaciones/${quote.version_siguiente_id}`)}>
+                Ir a la orden actualizada
+              </Button>
+            )
+          }
+        >
           Conserva los precios con los que se emitió, pero ya no está vigente ni compromete inventario.
         </Notice>
       )}

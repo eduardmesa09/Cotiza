@@ -176,6 +176,7 @@ class QuoteOut(QuoteSummaryOut):
     puede_crear_version: bool = False
     tiene_pdf: bool = False
     version_anterior_id: int | None = None
+    version_siguiente_id: int | None = None
     aprobacion: ApprovalBrief | None = None
 
 

@@ -53,6 +53,7 @@ def test_e10_una_modificacion_genera_una_nueva_version_recalculada(client, as_us
     # La versión anterior conserva sus precios congelados y queda marcada como reemplazada.
     v1 = get_quote(client, ejecutivo, v1["id"])
     assert v1["reemplazada"] is True
+    assert v1["version_siguiente_id"] == v2["id"] and v2["version_siguiente_id"] is None
     assert v1["estado"] == "EMITIDA"
     assert line(v1, DEMO_SKU)["precio_unitario"] == "729.60"
     assert v1["acciones_permitidas"] == [] and v1["puede_crear_version"] is False

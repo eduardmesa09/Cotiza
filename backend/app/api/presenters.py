@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.schemas import ApprovalBrief, LineOut, PartyRef, QuoteOut
 from app.domain.quote import Quote, QuoteLine
-from app.infra.models import Canal, SolicitudAprobacion, Usuario
+from app.infra.models import Canal, Cotizacion, SolicitudAprobacion, Usuario
 
 
 def line_out(linea: QuoteLine) -> LineOut:
@@ -102,6 +102,12 @@ class QuotePresenter:
             comentario=row.comentario,
         )
 
+    def _next_version_id(self, quote: Quote) -> int | None:
+        """La versión que reemplazó a esta, para poder ir a ella desde la anterior."""
+        if not quote.reemplazada:
+            return None
+        return self.session.scalar(select(Cotizacion.id).where(Cotizacion.version_anterior_id == quote.id).limit(1))
+
     def detail(self, quote: Quote) -> QuoteOut:
         return QuoteOut(
             **self.summary(quote),
@@ -110,6 +116,7 @@ class QuotePresenter:
             puede_crear_version=quote.puede_versionarse,
             tiene_pdf=quote.pdf_ruta is not None,
             version_anterior_id=quote.version_anterior_id,
+            version_siguiente_id=self._next_version_id(quote),
             aprobacion=self._approval(quote.id),
         )
 

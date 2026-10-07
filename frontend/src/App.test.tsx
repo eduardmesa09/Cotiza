@@ -198,6 +198,18 @@ describe("cotización: cuándo se puede emitir", () => {
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
+  it("una versión reemplazada ofrece ir a la orden actualizada", async () => {
+    const replaced = quote({ estado: "EMITIDA", reemplazada: true, acciones_permitidas: [], tiene_pdf: true, version_siguiente_id: 8 });
+    const current = quote({ id: 8, version: 2, estado: "BORRADOR", evaluacion: null, total: null, version_anterior_id: 7 });
+    open(replaced, { "GET /cotizaciones/8": current, "GET /cotizaciones/8/eventos": [] });
+    expect(await screen.findByText("Esta versión fue reemplazada")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ir a la orden actualizada" }));
+
+    expect(await screen.findByRole("heading", { name: "COT-000007 · v2" })).toBeInTheDocument();
+    expect(screen.queryByText("Esta versión fue reemplazada")).not.toBeInTheDocument();
+  });
+
   it("otro rol ve la cotización en modo lectura", async () => {
     mockApi({
       "GET /auth/me": userOf("gerente", 3),
