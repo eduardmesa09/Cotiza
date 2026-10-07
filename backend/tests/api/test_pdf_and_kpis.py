@@ -120,6 +120,22 @@ def test_cada_version_tiene_su_propio_documento(client, as_user, clock, demo_cha
     assert client.get(f"/api/cotizaciones/{v1['id']}/pdf", headers=ejecutivo).status_code == 200
 
 
+def test_si_el_archivo_se_perdio_el_documento_se_regenera_identico(client, as_user, clock, demo_channel, documents, storage):
+    """En un alojamiento con disco efímero los PDF desaparecen al reiniciar; la descarga no debe fallar."""
+    ejecutivo = as_user("ejecutivo")
+    quote = create_issued(client, ejecutivo, clock, demo_channel.id, ESTANDAR)
+    nombre = f"{quote['numero']}-v1.pdf"
+    original = storage.files.pop(nombre)
+    clock.advance(days=3)
+
+    response = client.get(f"/api/cotizaciones/{quote['id']}/pdf", headers=ejecutivo)
+
+    assert response.status_code == 200
+    assert response.content == original
+    assert documents.rendered[1] == documents.rendered[0]  # mismos datos congelados, no la fecha de hoy
+    assert storage.files[nombre] == original
+
+
 # --- Tablero de indicadores -----------------------------------------------------------
 
 

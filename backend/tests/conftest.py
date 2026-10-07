@@ -27,6 +27,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_catalog, get_clock, get_documents, get_inventory, get_storage
+from app.domain.errors import NotFoundError
 from app.domain.pricing_engine import ProductData
 from app.application.deadlines import DeadlineReport
 from app.infra.container import build_deadline_service
@@ -154,6 +155,8 @@ class FakeStorage:
         return nombre
 
     def read(self, ruta: str) -> bytes:
+        if ruta not in self.files:
+            raise NotFoundError("El archivo no existe")
         return self.files[ruta]
 
 

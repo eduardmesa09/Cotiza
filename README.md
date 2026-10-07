@@ -62,6 +62,33 @@ docker compose down -v     # detener y borrar la base de datos y los PDF (empeza
 Si un puerto está ocupado, cámbielo con una variable de entorno, por ejemplo
 `WEB_PORT=9090 docker compose up` (ver [.env.example](.env.example)).
 
+### Demo en línea, sin instalar nada (Render)
+
+Para que alguien revise el sistema solo con un navegador, el repositorio incluye
+[render.yaml](render.yaml): publica la misma aplicación en [Render](https://render.com) con
+un servicio web y una base PostgreSQL del plan gratuito.
+
+1. Suba el repositorio a GitHub.
+2. En Render: **New → Blueprint**, elija el repositorio y pulse **Apply**.
+3. Espere a que termine el primer despliegue (construye la imagen y carga el escenario de
+   demo; puede tardar más de diez minutos). La dirección queda en el servicio `cotiza`,
+   con la forma `https://cotiza-xxxx.onrender.com`.
+
+Los usuarios son los mismos de la tabla siguiente, más `ejecutivo2`. A tener en cuenta en el
+plan gratuito:
+
+- Tras 15 minutos sin uso el servicio se duerme; la siguiente visita tarda cerca de un
+  minuto en responder.
+- Al despertar, el ERP simulado vuelve a su estado inicial (precios y existencias) y los
+  PDF se regeneran al descargarlos, idénticos a los emitidos.
+- Render borra las bases gratuitas pasado un tiempo (revise el plazo vigente en su panel).
+  Si ocurre, cree de nuevo el Blueprint.
+- Las promociones semilla duran unas semanas desde el primer arranque; pasado ese plazo,
+  el rol `pricing` puede ampliarlas.
+
+En esta modalidad la interfaz, la API y el ERP simulado corren en un solo contenedor
+([deploy/render/](deploy/render/)); el código es el mismo que levanta Docker Compose.
+
 ## Usuarios de prueba
 
 Todos usan la contraseña `Cotiza2026*`.

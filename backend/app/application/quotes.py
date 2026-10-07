@@ -233,4 +233,15 @@ class QuoteService:
         quote = self.get(actor, quote_id)
         if quote.pdf_ruta is None:
             raise NotFoundError("La cotización todavía no tiene documento: se genera al emitirla")
-        return f"{quote.numero}-v{quote.version}.pdf", self.storage.read(quote.pdf_ruta)
+        nombre = f"{quote.numero}-v{quote.version}.pdf"
+        try:
+            return nombre, self.storage.read(quote.pdf_ruta)
+        except NotFoundError:
+            # El archivo se perdió (almacenamiento efímero): se vuelve a generar. Sale idéntico,
+            # porque los precios, las fechas y la vigencia quedaron congelados al emitir (RN-13).
+            settings = self.pricing.get_settings()
+            channel = self.customers.get(quote.canal_id)
+            ejecutivo = self.users.name_of(quote.ejecutivo_id) or ""
+            contenido = self.documents.render_quote(build_quote_document(quote, channel, ejecutivo, settings.calendar.tz))
+            self.storage.save(quote.pdf_ruta, contenido)
+            return nombre, contenido
