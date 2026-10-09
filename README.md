@@ -5,7 +5,7 @@ Intcomex Colombia: del registro de la solicitud a la cotización emitida en PDF,
 calculado por reglas, disponibilidad neta, aprobación con plazo, seguimiento y trazabilidad.
 
 Proyecto del curso Gerencia de Operaciones en TI, Universidad de La Sabana (2026-2).
-El diseño completo está en [docs/COTIZA_Informe_Cap1-7_v3.docx](docs/COTIZA_Informe_Cap1-7_v3.docx).
+El diseño completo está en [docs/COTIZA_Informe_Cap1-8.pdf](docs/COTIZA_Informe_Cap1-8.pdf).
 
 > Prototipo académico. Todos los datos (catálogo, canales, precios, usuarios) son simulados.
 > No se conecta a ningún sistema de Intcomex.
@@ -62,32 +62,27 @@ docker compose down -v     # detener y borrar la base de datos y los PDF (empeza
 Si un puerto está ocupado, cámbielo con una variable de entorno, por ejemplo
 `WEB_PORT=9090 docker compose up` (ver [.env.example](.env.example)).
 
-### Demo en línea, sin instalar nada (Render)
+### Demo en línea, sin instalar nada
 
-Para que alguien revise el sistema solo con un navegador, el repositorio incluye
-[render.yaml](render.yaml): publica la misma aplicación en [Render](https://render.com) con
-un servicio web y una base PostgreSQL del plan gratuito.
+La aplicación está publicada en **https://cotiza-hqsn.onrender.com**, con el escenario de
+demostración ya cargado. Se ingresa con cualquiera de los usuarios de la tabla siguiente, más
+`ejecutivo2`.
 
-1. Suba el repositorio a GitHub.
-2. En Render: **New → Blueprint**, elija el repositorio y pulse **Apply**.
-3. Espere a que termine el primer despliegue (construye la imagen y carga el escenario de
-   demo; puede tardar más de diez minutos). La dirección queda en el servicio `cotiza`,
-   con la forma `https://cotiza-xxxx.onrender.com`.
-
-Los usuarios son los mismos de la tabla siguiente, más `ejecutivo2`. A tener en cuenta en el
-plan gratuito:
+Está en el plan gratuito de [Render](https://render.com), lo que implica:
 
 - Tras 15 minutos sin uso el servicio se duerme; la siguiente visita tarda cerca de un
   minuto en responder.
 - Al despertar, el ERP simulado vuelve a su estado inicial (precios y existencias) y los
   PDF se regeneran al descargarlos, idénticos a los emitidos.
-- Render borra las bases gratuitas pasado un tiempo (revise el plazo vigente en su panel).
-  Si ocurre, cree de nuevo el Blueprint.
-- Las promociones semilla duran unas semanas desde el primer arranque; pasado ese plazo,
+- Las promociones semilla duran unas semanas desde que se cargó la demo; pasado ese plazo,
   el rol `pricing` puede ampliarlas.
+- En esta modalidad la interfaz, la API y el ERP simulado corren en un solo contenedor
+  ([deploy/render/](deploy/render/)); el código es el mismo que levanta Docker Compose. El ERP
+  simulado solo es accesible internamente.
 
-En esta modalidad la interfaz, la API y el ERP simulado corren en un solo contenedor
-([deploy/render/](deploy/render/)); el código es el mismo que levanta Docker Compose.
+Para publicar una copia propia, el repositorio incluye [render.yaml](render.yaml): en Render,
+**New → Blueprint**, elija el repositorio y pulse **Apply**. El primer despliegue construye la
+imagen y carga el escenario de demostración (puede tardar más de diez minutos).
 
 ## Usuarios de prueba
 
@@ -104,99 +99,6 @@ Todos usan la contraseña `Cotiza2026*`.
 
 Quien propone un descuento no puede aprobarlo, quien administra las reglas no emite
 cotizaciones y quien gestiona usuarios no participa del proceso comercial.
-
-## Guion de demostración
-
-Pensado para un video de 5 a 10 minutos. Antes de grabar:
-
-1. `docker compose down -v` y `docker compose up --build` para partir de cero.
-2. `docker compose exec api python -m app.infra.demo` para tener historia en el tablero.
-3. Entre como `pricing` → **Reglas y promociones** → **Plazos** y ajuste:
-
-   | Parámetro | Valor para la demo | Efecto |
-   |---|---|---|
-   | `horario_habil_activo` | `false` | Los plazos y tiempos corren en reloj real, a cualquier hora |
-   | `sla_aprobacion_minutos` | `2` | El escalamiento ocurre a los 2 minutos |
-   | `seguimiento_minutos` | `3` | La tarea de seguimiento aparece a los 3 minutos |
-   | `vigencia_minutos` | `6` | La cotización vence a los 6 minutos |
-
-   El planificador revisa los plazos cada 30 segundos: un vencimiento puede tardar hasta
-   medio minuto en reflejarse. Sin el primer ajuste, fuera del horario de 09:00 a 17:00
-   (lunes a viernes, hora de Bogotá) los tiempos del tablero se miden como cero.
-
-### 1. Cotización estándar (el caso de los 7 minutos)
-
-Como `ejecutivo`: **Nueva cotización**.
-
-- Canal: *Soluciones Andinas TI S.A.S. (demo)*, nivel Plata.
-- Busque `demo` y agregue `POR-DEMO01`; cantidad **20**.
-- **Calcular**. Resultado: precio **729,60**, margen **15,02 %**, total **USD 14.592,00**.
-- Despliegue la línea para ver las reglas aplicadas: lista 800 → nivel Plata 4 % → 768 →
-  promoción vigente 5 % → 729,60 (la escala por volumen de 2 % no se acumula: aplica el mayor).
-- **Emitir** y **Descargar PDF**. El historial de la derecha muestra cada paso con su hora.
-
-Es el ejemplo de la sección 6.6.3 del informe.
-
-### 2. Descuento que requiere aprobación
-
-Nueva cotización con la misma referencia y cantidad, y **9** en *Desc. adicional*.
-
-- **Calcular**: precio 663,94, margen **6,62 %**, por debajo del 8 % mínimo de Portátiles.
-  El botón **Emitir** queda deshabilitado.
-- **Solicitar aprobación**.
-- Cierre sesión y entre como `aprobador`: la solicitud aparece con todo su contexto y el
-  tiempo que queda de plazo. **Aprobar** con un comentario.
-- Vuelva como `ejecutivo`: la campana avisa la aprobación. Abra la cotización y
-  **Confirmar emisión**.
-
-Variante: **Rechazar** con comentario; la cotización vuelve al ejecutivo, que baja el
-descuento, recalcula y emite.
-
-### 3. Plazo de aprobación vencido
-
-Solicite otra aprobación y no la resuelva. A los 2 minutos (más hasta 30 segundos), entre
-como `gerente`: la solicitud aparece en **Escalamientos**, marcada como escalada, y el
-gerente y el aprobador reciben la notificación.
-
-### 4. Controles que no se pueden saltar
-
-- **Precio bajo el costo:** con **20** en *Desc. adicional* el precio (583,68) queda bajo el
-  costo (620). La cotización no se puede emitir ni enviar a aprobación.
-- **Bajo pedido:** pida más unidades de las disponibles; la línea se marca *Bajo pedido* con
-  alerta, pero no impide emitir.
-- **Disponibilidad neta:** tras emitir 20 unidades, una cotización nueva de la misma
-  referencia ve 20 disponibles menos.
-- **Referencia no cotizable:** busque `POR-00017` (no tiene costo cargado en el ERP); aparece
-  marcada como *No cotizable* y no se puede agregar.
-
-### 5. Seguimiento y vigencia
-
-A los 3 minutos de emitida sin cierre, el `ejecutivo` recibe una tarea en **Seguimiento**:
-**Ganada**, **Perdida** o **Mantener en seguimiento**. A los 6 minutos sin cierre, la
-cotización pasa a *Vencida* y libera el inventario.
-
-### 6. Precio congelado y nueva versión
-
-Con una cotización emitida, cambie el precio de lista en el ERP simulado:
-
-```bash
-curl -X PATCH http://localhost:8001/products/POR-DEMO01/price \
-  -H "Content-Type: application/json" -d '{"precio_lista": "900.00"}'
-```
-
-La cotización emitida conserva 729,60. **Nueva versión** crea la versión 2 en borrador; al
-calcularla toma el precio nuevo (820,80), y la versión 1 queda marcada como reemplazada.
-
-### 7. Administración de reglas
-
-Como `pricing`: cree una promoción con vigencia, o cambie el margen mínimo de una categoría.
-El siguiente cálculo ya usa el valor nuevo, sin reiniciar nada. Dos promociones con vigencias
-superpuestas para la misma referencia se rechazan.
-
-### 8. Tablero
-
-Como `gerente`: **Indicadores**. Cada tarjeta compara el valor medido con la línea base del
-proceso manual y con la meta. El `ejecutivo` ve solo los indicadores de sus cotizaciones.
 
 ## Arquitectura
 
