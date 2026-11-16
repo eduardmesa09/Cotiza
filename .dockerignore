@@ -1,9 +1,0 @@
-# Solo aplica a la imagen de Render, que se construye desde la raíz (deploy/render/Dockerfile).
-.git
-docs
-**/node_modules
-**/dist
-**/__pycache__
-**/.pytest_cache
-**/.venv
-**/storage
