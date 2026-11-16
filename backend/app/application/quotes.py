@@ -237,7 +237,7 @@ class QuoteService:
         try:
             return nombre, self.storage.read(quote.pdf_ruta)
         except NotFoundError:
-            # El archivo se perdió (almacenamiento efímero): se vuelve a generar. Sale idéntico,
+            # El archivo se perdió del almacenamiento: se vuelve a generar. Sale idéntico,
             # porque los precios, las fechas y la vigencia quedaron congelados al emitir (RN-13).
             settings = self.pricing.get_settings()
             channel = self.customers.get(quote.canal_id)

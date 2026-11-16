@@ -169,12 +169,8 @@ Toda otra transición lanza un error de dominio. Cada transición registra un ev
 - Las promociones semilla se limitan para que, aun con nivel Oro, no dejen el margen bajo el mínimo de la categoría: una cotización estándar no debe pedir aprobación solo por la promoción.
 - `README.md` es el entregable de documentación: inicio rápido, usuarios, guion de demo, arquitectura, pruebas y limitaciones. Si cambia un comando, un usuario o un parámetro de demo, actualizarlo.
 
-### Demo en línea (Render)
-
-- `render.yaml` + `deploy/render/` publican la demo en Render (plan gratuito): una sola imagen con Nginx, API y ERP simulado, más una base PostgreSQL. Es solo empaquetado; Docker Compose sigue siendo la forma de desarrollar y entregar. Probar en local: `docker build -f deploy/render/Dockerfile -t cotiza-render .`.
-- `start.sh` adapta `DATABASE_URL` al controlador psycopg, corre migraciones y semillas y, con `LOAD_DEMO=true`, el escenario de demo (solo surte efecto con la base vacía).
-- El disco allí es efímero: `QuoteService.document` regenera el PDF si el archivo ya no existe (sale idéntico porque los datos quedaron congelados al emitir).
-- Si se agrega un servicio o una variable de entorno a Docker Compose, reflejarlo en `deploy/render/`.
+- La demostración se hace solo en local con Docker Compose; no hay despliegue en línea.
+- Si el PDF de una cotización emitida ya no está en `STORAGE_DIR`, `QuoteService.document` lo regenera al descargarlo (sale idéntico porque los datos quedaron congelados al emitir).
 
 ### Pruebas
 

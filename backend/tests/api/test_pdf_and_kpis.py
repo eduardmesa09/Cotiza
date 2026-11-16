@@ -121,7 +121,7 @@ def test_cada_version_tiene_su_propio_documento(client, as_user, clock, demo_cha
 
 
 def test_si_el_archivo_se_perdio_el_documento_se_regenera_identico(client, as_user, clock, demo_channel, documents, storage):
-    """En un alojamiento con disco efímero los PDF desaparecen al reiniciar; la descarga no debe fallar."""
+    """Si el PDF ya no está en el almacenamiento, la descarga no debe fallar."""
     ejecutivo = as_user("ejecutivo")
     quote = create_issued(client, ejecutivo, clock, demo_channel.id, ESTANDAR)
     nombre = f"{quote['numero']}-v1.pdf"
